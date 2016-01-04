@@ -1,13 +1,15 @@
 #!/usr/bin/env perl6
 use v6;
+#use Grammar::Tracer;
 
 class Entry {
     has Str:D $.pinyin = ...;
-    has Str $.ideograph;
-    has @.defs;
+    has Str:_ $.ideograph;
+    has Array $.defs;
 }
 class Headword is Entry {
     has Str $.etymology;
+    has Array $.entries;
 }
 
 grammar G {
@@ -15,19 +17,19 @@ grammar G {
     token sig-example { \xE738 } # 例
     token text { \N+ }
     token pinyin { z\S* }
-    token ideograph { \S }
+    token ideograph { <-[\x00 .. \xFF]> }
     rule def {
         ^^ <sig-rank> <text>
     }
     rule etymology {
-        '(' (<-[\n )]>+) ')'
+        '(' (<-[\n )]>+) ')' \N*
     }
     regex entry { 
-        ^^ \N+ '＝' \N+ <.ws>
+        ^^ (\N+ '＝' : \N+) <.ws>
     }
     rule headword {
         ^^ <ideograph> <etymology>
-        <def>+
+        [ <def>+ || <text> ]
         <entry>*
     }
     rule syllable {
@@ -41,25 +43,27 @@ sub untag ($_ is copy) { s:g/'<' <-[<>]>* '>'//; $_ }
 
 class A {
     method def (\x) { x.make: ~x<text> }
+    method entry (\x) { x.make: ~x[0] }
     method ideograph (\x) { x.make: ~x }
     method etymology (\x) { x.make: ~x[0] }
     method headword (\x) { x.make: {
-        defs => x<def>».made,
+        defs => x<text> ?? ~x<text> !! x<def>».made,
         ideograph => x<ideograph>.made,
         etymology => x<etymology>.made,
+        entries => x<entry>».made,
     } }
     method sig-rank (\x) { x.make( x.ord - 0xE896) }
     method syllable (\x) {
-        x.make: map { 
-            Headword.new: pinyin => ~x<pinyin>, |$_.made
-        }, x<headword>
+        x.make: x<headword>.map:{
+            Headword.new: pinyin => ~x<pinyin>, |.made,
+        },
     }
     method TOP (\x) { x.make: x<syllable>».made }
 }
 
 
 my \match = G.parse: sample, actions => A.new;
-say match.made;
+say match.made[0][0].entries[];
 
 sub sample { '
 zung 粽綜錝
