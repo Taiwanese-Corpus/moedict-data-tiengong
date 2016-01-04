@@ -1,6 +1,14 @@
 #!/usr/bin/env perl6
 use v6;
 
+=begin sample
+zung
+粽
+(作弄切，宗去聲。角黍也。)
+參考「粽仔」。
+參考「肉粽粽仔」。
+=end sample
+
 grammar G {
     token sig-rank { <[ \xE897 .. \xE89F ]> } # 1 - 9
     token sig-example { \xE738 } # 例
@@ -17,7 +25,7 @@ class A {
 my $match = G.parse: sample, actions => A.new;
 say $match.made;
 
-sub sample { q「
+sub sample { '
 	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="Times New Roman, serif"><font size="4" style="font-size: 14pt"><i><b>zung
 	</b></i></font></font><font face="新細明體"><span lang="zh-TW"><font face="華康中黑體"><font size="2" style="font-size: 11pt"><b>粽綜錝</b></font></font></span></font></p>
 	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="新細明體"><span lang="zh-TW"><font face="細明體"><b>粽</b></font></span></font><font face="Times New Roman, serif"><font size="1" style="font-size: 8pt"><b>(</b></font></font><font face="新細明體"><span lang="zh-TW"><font face="細明體"><font size="1" style="font-size: 8pt"><b>作弄</b></font></font><font size="1" style="font-size: 8pt"><b>切，宗去聲。角黍也。</b></font></span></font><font face="Times New Roman, serif"><font size="1" style="font-size: 8pt"><b>)</b></font></font></p>
@@ -189,4 +197,4 @@ sub sample { q「
 	<br/>
 
 	</p>
-」}
+' }
