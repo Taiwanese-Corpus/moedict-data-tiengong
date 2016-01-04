@@ -1,200 +1,184 @@
 #!/usr/bin/env perl6
 use v6;
 
-=begin sample
-zung
-粽
-(作弄切，宗去聲。角黍也。)
-參考「粽仔」。
-參考「肉粽粽仔」。
-=end sample
+class Entry {
+    has Str:D $.pinyin = ...;
+    has Str $.ideograph;
+    has @.defs;
+}
+class Headword is Entry {
+    has Str $.etymology;
+}
 
 grammar G {
     token sig-rank { <[ \xE897 .. \xE89F ]> } # 1 - 9
     token sig-example { \xE738 } # 例
-    rule syllable { '<i>' '<b>' .*? (<-[<>\s]>+) '</b>' '</i>' }
-    rule TOP { ^ [ .*? <syllable> ]+ .* }
+    token text { \N+ }
+    token pinyin { z\S* }
+    token ideograph { \S }
+    rule def {
+        ^^ <sig-rank> <text>
+    }
+    rule etymology {
+        '(' (<-[\n )]>+) ')'
+    }
+    regex entry { 
+        ^^ \N+ '＝' \N+ <.ws>
+    }
+    rule headword {
+        ^^ <ideograph> <etymology>
+        <def>+
+        <entry>*
+    }
+    rule syllable {
+        ^^ <pinyin> \N+
+        <headword>+
+    }
+    rule TOP { ^ [ <syllable> .*? ]+ .* $ }
 }
+
+sub untag ($_ is copy) { s:g/'<' <-[<>]>* '>'//; $_ }
 
 class A {
-    method sig-rank ($/) { $/.make( $/.ord - 0xE896) }
-    method syllable ($/) { $/.make: $0 }
-    method TOP ($/) { $/.make: $<syllable>».made }
+    method def (\x) { x.make: ~x<text> }
+    method ideograph (\x) { x.make: ~x }
+    method etymology (\x) { x.make: ~x[0] }
+    method headword (\x) { x.make: {
+        defs => x<def>».made,
+        ideograph => x<ideograph>.made,
+        etymology => x<etymology>.made,
+    } }
+    method sig-rank (\x) { x.make( x.ord - 0xE896) }
+    method syllable (\x) {
+        x.make: map { 
+            Headword.new: pinyin => ~x<pinyin>, |$_.made
+        }, x<headword>
+    }
+    method TOP (\x) { x.make: x<syllable>».made }
 }
 
-my $match = G.parse: sample, actions => A.new;
-say $match.made;
+
+my \match = G.parse: sample, actions => A.new;
+say match.made;
 
 sub sample { '
-	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="Times New Roman, serif"><font size="4" style="font-size: 14pt"><i><b>zung
-	</b></i></font></font><font face="新細明體"><span lang="zh-TW"><font face="華康中黑體"><font size="2" style="font-size: 11pt"><b>粽綜錝</b></font></font></span></font></p>
-	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="新細明體"><span lang="zh-TW"><font face="細明體"><b>粽</b></font></span></font><font face="Times New Roman, serif"><font size="1" style="font-size: 8pt"><b>(</b></font></font><font face="新細明體"><span lang="zh-TW"><font face="細明體"><font size="1" style="font-size: 8pt"><b>作弄</b></font></font><font size="1" style="font-size: 8pt"><b>切，宗去聲。角黍也。</b></font></span></font><font face="Times New Roman, serif"><font size="1" style="font-size: 8pt"><b>)</b></font></font></p>
-	<p style="text-indent: 0cm; margin-bottom: 0cm; line-height: 0.53cm">
-	<font face="新細明體"><span lang="zh-TW">參考「<font face="細明體">粽</font>仔」。</span></font></p>
-	<p style="text-indent: 0cm; margin-bottom: 0cm; line-height: 0.53cm">
-	<font face="新細明體"><span lang="zh-TW">參考「肉粽粽仔」。</span></font></p>
-	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="Times New Roman, serif"><font size="2" style="font-size: 11pt">zung
-	è </font></font><font face="新細明體"><span lang="zh-TW"><span style="letter-spacing: normal">粽仔＝用竹葉或竹籜裹糯米和佐料所製成的食品，客家習俗通常在端午節及七月半做來吃。客家粽包括有米粽、粄粽、焿粽。</span></span></font></p>
-	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="Times New Roman, serif"><font size="2" style="font-size: 11pt">zung
-	kuan </font></font><font face="新細明體"><span lang="zh-TW"><span style="letter-spacing: normal">粽擐＝綁粽子用的繩串。</span><font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font>包<font face="細明體">粽</font>仔之前，愛先<font face="細明體">粽擐吊</font>起來。</span></font></p>
-	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="Times New Roman, serif"><font size="2" style="font-size: 11pt">zung</font><font size="1" style="font-size: 8pt">
-	</font><font size="2" style="font-size: 11pt">yap
-	</font></font><font face="新細明體"><span lang="zh-TW"><span style="letter-spacing: normal">粽葉＝包粽子時用的竹葉。</span><font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font><span style="letter-spacing: normal">焿粽愛用粽葉來包，較脆；米粽愛用竹殼來包，較球；粄粽愛用月桃葉來包，較夭。</span></span></font></p>
-	<p class="western" style="margin-left: 0.64cm; text-indent: -0.64cm; margin-bottom: 0cm; line-height: 0.53cm">
-	<font face="Times New Roman, serif"><font size="4" style="font-size: 14pt"><i><b>zụt
-	</b></i></font></font><font face="新細明體"><span lang="zh-TW"><font face="華康中黑體"><font size="2" style="font-size: 11pt"><b>卒脺</b></font></font></span></font></p>
-	<p class="western" style="margin-left: 0.64cm; text-indent: -0.64cm; margin-bottom: 0cm; line-height: 0.53cm">
-	<font face="新細明體"><span lang="zh-TW"><font face="細明體"><b>卒</b></font></span></font><font face="Times New Roman, serif"><font size="1" style="font-size: 8pt"><b>(</b></font></font><font face="新細明體"><span lang="zh-TW"><font face="細明體"><font size="1" style="font-size: 8pt"><b>臧</b></font></font><font size="1" style="font-size: 8pt"><b>沒切，尊入聲。說文：隸人給事者。</b></font></span></font><font face="Times New Roman, serif"><font size="1" style="font-size: 8pt"><b>)</b></font></font></p>
-	<p style="margin-left: 0.68cm; text-indent: -0.33cm; margin-bottom: 0cm; line-height: 0.53cm">
-	<font face="新細明體"><span lang="zh-TW">兵士。<font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font>兵<font face="細明體">卒</font>。</span></font></p>
-	<p style="margin-left: 0.68cm; text-indent: -0.33cm; margin-bottom: 0cm; line-height: 0.53cm">
-	<font face="新細明體"><span lang="zh-TW"><font face="細明體">象棋</font>中的<font face="細明體">卒</font>子。</span></font></p>
-	<p style="margin-left: 0.68cm; text-indent: -0.33cm; margin-bottom: 0cm; line-height: 0.53cm">
-	<font face="新細明體"><span lang="zh-TW"><font face="細明體">終</font>了。<font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font><font face="細明體">卒業</font>。</span></font></p>
-	<p style="margin-left: 0.68cm; text-indent: -0.33cm; margin-bottom: 0cm; line-height: 0.53cm">
-	<font face="新細明體"><span lang="zh-TW">心情<font face="細明體">悒鬱</font>。<font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font>心情殟</span></font><font face="Times New Roman, serif">(vụt)</font><font face="新細明體"><span lang="zh-TW"><font face="細明體">卒</font>。</span></font></p>
-	<p class="western" style="margin-left: 0.64cm; text-indent: -0.64cm; margin-bottom: 0cm; line-height: 0.53cm">
-	<font face="新細明體"><span lang="zh-TW"><font face="細明體"><b>脺</b></font></span></font><font face="Times New Roman, serif"><font size="1" style="font-size: 8pt"><b>(</b></font></font><font face="新細明體"><span lang="zh-TW"><font face="細明體"><font size="1" style="font-size: 8pt"><b>客語借用字</b></font></font><font size="1" style="font-size: 8pt"><b>。</b></font></span></font><font face="Times New Roman, serif"><font size="1" style="font-size: 8pt"><b>)</b></font></font></p>
-	<p style="text-indent: 0cm; margin-bottom: 0cm; line-height: 0.53cm">
-	<font face="新細明體"><span lang="zh-TW"><span style="letter-spacing: normal">胖的樣子。</span><font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font><span style="letter-spacing: normal"><font face="標楷體">人害人肥脺脺，天害人一把骨。</font></span></span></font></p>
-	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="Times New Roman, serif"><font size="2" style="font-size: 11pt">z</font><font size="2" style="font-size: 11pt">ụ</font><font size="2" style="font-size: 11pt">t
-	è </font></font><font face="新細明體"><span lang="zh-TW"><span style="letter-spacing: normal">卒仔＝</span><span style="letter-spacing: normal"></span><span style="letter-spacing: normal">小兵。</span><font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font><span style="letter-spacing: normal">毋好看別人恁無，成時細卒仔乜會建立大功勞。</span><span style="letter-spacing: normal"></span><span style="letter-spacing: normal">象棋中的卒子。</span><font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font><span style="letter-spacing: normal">卒仔過河，一步一步行，堵佇象腳、馬腳就當有用處。</span></span></font></p>
-	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="Times New Roman, serif"><font size="2" style="font-size: 11pt">z</font><font size="2" style="font-size: 11pt">ụ</font><font size="2" style="font-size: 11pt">t
-	ngiap </font></font><font face="新細明體"><span lang="zh-TW"><font face="細明體"><span lang="ja-JP">卒業</span></font><span lang="ja-JP">＝</span><font face="細明體"><span lang="ja-JP">畢業，源自日本語「卒業</span></font></span></font><font face="Times New Roman, serif">(</font><font face="新細明體"><span lang="zh-TW"><font face="MS Mincho"><font size="1" style="font-size: 8pt"><span lang="ja-JP">そつぎ</span></font></font><font face="MS Mincho"><font size="1" style="font-size: 8pt"><span lang="ja-JP">ょ</span></font></font><font face="MS Mincho"><font size="1" style="font-size: 8pt"><span lang="ja-JP">う</span></font></font></span></font><font face="Times New Roman, serif">)</font><font face="新細明體"><span lang="zh-TW"><font face="細明體"><span lang="ja-JP">」</span></font><span lang="ja-JP">。</span><font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font>你看佢小學都無<font face="細明體">卒業</font>，事<font face="細明體">業</font>乜做到<font face="細明體">拚拚袞</font>。</span></font></p>
-	<p class="western" style="margin-left: 0.64cm; text-indent: -0.64cm; margin-bottom: 0cm; line-height: 0.53cm">
-	<font face="Times New Roman, serif"><font size="4" style="font-size: 14pt"><i><b>zut
-	</b></i></font></font><font face="新細明體"><span lang="zh-TW"><font face="華康中黑體"><font size="2" style="font-size: 11pt"><b>啐椊</b></font></font></span></font></p>
-	<p class="western" style="margin-left: 0.64cm; text-indent: -0.64cm; margin-bottom: 0cm; line-height: 0.53cm">
-	<font face="新細明體"><span lang="zh-TW"><b>啐</b></span></font><font face="Times New Roman, serif"><font size="1" style="font-size: 8pt"><b>(</b></font></font><font face="新細明體"><span lang="zh-TW"><font face="細明體"><font size="1" style="font-size: 8pt"><b>子聿</b></font></font><font size="1" style="font-size: 8pt"><b>切，即聿切，即律切，音卒。嘈啐，眾聲也。</b></font></span></font><font face="Times New Roman, serif"><font size="1" style="font-size: 8pt"><b>)</b></font></font></p>
-	<p style="margin-left: 0.68cm; text-indent: -0.33cm; margin-bottom: 0cm; line-height: 0.53cm">
-	<font face="新細明體"><span lang="zh-TW">被人利用的傻子，參考「阿啐頭」。</span></font></p>
-	<p style="margin-left: 0.68cm; text-indent: -0.33cm; margin-bottom: 0cm; line-height: 0.53cm">
-	<font face="新細明體"><span lang="zh-TW">細語不斷的樣子，又作「</span></font><font face="Times New Roman, serif">cut</font><font face="新細明體"><span lang="zh-TW">」。<font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font>唧唧啐啐</span></font><font face="Times New Roman, serif">(zit
-	zit zut zut)</font><font face="新細明體"><span lang="zh-TW">。</span></font></p>
-	<p style="margin-left: 0.68cm; text-indent: -0.33cm; margin-bottom: 0cm; line-height: 0.53cm">
-	<font face="新細明體"><span lang="zh-TW">參考「肉啐啐仔」。</span></font></p>
-	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="新細明體"><span lang="zh-TW"><font face="細明體"><b>椊</b></font></span></font><font face="Times New Roman, serif"><font size="1" style="font-size: 8pt"><b>(</b></font></font><font face="新細明體"><span lang="zh-TW"><font face="細明體"><font size="1" style="font-size: 8pt"><b>昨</b></font></font><font size="1" style="font-size: 8pt"><b>沒切，存入聲。唐韻：</b></font><font face="細明體"><font size="1" style="font-size: 8pt"><b>椊</b></font></font><font size="1" style="font-size: 8pt"><b>杌，以柄內孔也。玉篇：柱頭枘也。</b></font></span></font><font face="Times New Roman, serif"><font size="1" style="font-size: 8pt"><b>)</b></font></font><font face="新細明體"><span lang="zh-TW"><b>讀音作「</b></span></font><font face="Times New Roman, serif"><b>cụt</b></font><font face="新細明體"><span lang="zh-TW"><font face="細明體"><b>」</b></font><b>。</b></span></font></p>
-	<p style="margin-left: 0.68cm; text-indent: -0.33cm; margin-bottom: 0cm; line-height: 0.53cm">
-	<font face="新細明體"><span lang="zh-TW">塞子。<font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font><font face="細明體">樹椊</font>仔。</span></font></p>
-	<p style="margin-left: 0.68cm; text-indent: -0.33cm; margin-bottom: 0cm; line-height: 0.53cm">
-	<font face="新細明體"><span lang="zh-TW">塞住。<font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font><font face="細明體">椊緪</font>、<font face="細明體">椊倒</font>轉去。</span></font></p>
-	<p style="margin-left: 0.68cm; text-indent: -0.33cm; margin-bottom: 0cm; line-height: 0.53cm">
-	<font face="新細明體"><span lang="zh-TW">頭<font face="細明體">撞</font>地。<font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font><font face="細明體">椊</font>落<font face="細明體">崩崗</font>下、<font face="細明體">椊</font>捯。</span></font></p>
-	<p style="margin-left: 0.68cm; text-indent: -0.33cm; margin-bottom: 0cm; line-height: 0.53cm">
-	<font face="新細明體"><span lang="zh-TW">塞</span></font><font face="Times New Roman, serif">(</font><font face="新細明體"><span lang="zh-TW"><font face="細明體">某</font>物</span></font><font face="Times New Roman, serif">)</font><font face="新細明體"><span lang="zh-TW">給人。<font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font>名片<font face="細明體">椊</font>等來、<font face="細明體">椊</font>分佢。</span></font></p>
-	<p style="margin-left: 0.68cm; text-indent: -0.33cm; margin-bottom: 0cm; line-height: 0.53cm">
-	<font face="新細明體"><span lang="zh-TW">放置。<font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font><font face="細明體">椊</font>奈位去。</span></font></p>
-	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="Times New Roman, serif"><font size="2" style="font-size: 11pt">zut
-	bún g</font><font size="2" style="font-size: 11pt"><u>i</u></font><font size="2" style="font-size: 11pt">
-	</font></font><font face="新細明體"><span lang="zh-TW"><font face="細明體">椊</font>分佢＝塞給他。<font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font>你插蛸佢愛<font face="細明體">抑無</font>愛，<font face="細明體">椊</font>分佢就好走哩。</span></font></p>
-	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="Times New Roman, serif"><font size="2" style="font-size: 11pt">zut
-	bún g</font><font size="2" style="font-size: 11pt"><u>i</u></font><font size="2" style="font-size: 11pt">
-	sì </font></font><font face="新細明體"><span lang="zh-TW"><span style="letter-spacing: normal">椊分佢死＝抓他的頭撞地，把他給撞死。</span></span></font></p>
-	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="Times New Roman, serif"><font size="2" style="font-size: 11pt">z<span dir="ltr" style="float: left; width: 5cm; height: 0.5cm; border: none; padding: 0cm; background: #ffffff">
-		<p align="right" style="margin-left: 0cm; text-indent: 0cm; margin-bottom: 0cm; line-height: 0.42cm">
-		<font face="Times New Roman, serif"><i>zung </i></font><font face="新細明體"><span lang="zh-TW">－</span></font><font face="Times New Roman, serif"><i>zut
-		</i></font>
-		</p>
-	</span>ut dèn </font></font><font face="新細明體"><span lang="zh-TW"><font face="細明體">椊</font>等＝塞子塞住。<font face="華康粗黑體"><font size="1"><b></b></font></font>好得有<font face="細明體">椊</font>仔<font face="細明體">椊</font>等，無<font face="細明體">俟</font>早都揮發淨淨哩。</span></font>
-	</p>
-	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="Times New Roman, serif"><font size="2" style="font-size: 11pt">zut
-	dèn l</font><font size="2" style="font-size: 11pt"><u>o</u></font><font size="2" style="font-size: 11pt">i
-	</font></font><font face="新細明體"><span lang="zh-TW"><font face="細明體">椊</font>等來＝</span></font><font face="Times New Roman, serif">(</font><font face="新細明體"><span lang="zh-TW">很多東西</span></font><font face="Times New Roman, serif">)</font><font face="新細明體"><span lang="zh-TW">塞著過來。<font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font>人看佢山歌唱到恁好，名片相<font face="細明體">埰椊</font>等來分佢，<font face="細明體">想</font>愛認識佢。</span></font></p>
-	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="Times New Roman, serif"><font size="2" style="font-size: 11pt">zut
-	dò </font></font><font face="新細明體"><span lang="zh-TW"><font face="細明體">椊</font>捯＝頭<font face="細明體">撞</font>到地。<font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font>佢上隻月<font face="細明體">椊</font>捯了後，無<font face="細明體">醒</font>來過，醫生<font face="細明體">宣</font>布佢傷捯大腦，可能會變<font face="細明體">植</font>物人。</span></font></p>
-	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="Times New Roman, serif"><font size="2" style="font-size: 11pt">zut
-	do zòn hi </font></font><font face="新細明體"><span lang="zh-TW">椊倒轉去＝把蓋子蓋回去。<font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font>豆<font face="細明體">油倒</font>好過後，<font face="細明體">椊</font>仔愛<font face="細明體">椊倒</font>轉去，正毋會走味。</span></font></p>
-	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="Times New Roman, serif"><font size="2" style="font-size: 11pt">zut
-	è </font></font><font face="新細明體"><span lang="zh-TW"><span style="letter-spacing: normal">椊仔＝瓶口的塞子。</span><font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font>頭擺罌仔都用<font face="細明體">樹椊</font>仔來<font face="細明體">椊</font>，這下用<font face="細明體">捦</font>上去个，其<font face="細明體">實</font>做毋得講係<font face="細明體">椊</font>仔哩。</span></font></p>
-	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="Times New Roman, serif"><font size="2" style="font-size: 11pt">zut
-	h</font><font size="2" style="font-size: 11pt"><u>e</u></font><font size="2" style="font-size: 11pt">n
-	</font></font><font face="新細明體"><span lang="zh-TW"><font face="細明體">椊緪</font>＝塞子塞緊。<font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font><font face="細明體">酒椊</font>仔愛<font face="細明體">椊緪來</font>，無<font face="細明體">俟</font></span></font><font face="Times New Roman, serif">(s<u>i</u>i)</font><font face="新細明體"><span lang="zh-TW">會走味哦！</span></font></p>
-	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="Times New Roman, serif"><font size="2" style="font-size: 11pt">zut
-	het het </font></font><font face="新細明體"><span lang="zh-TW"><font face="細明體">椊閡閡</font>＝塞得緊緊地。<font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font><font face="細明體">椊</font>仔<font face="細明體">椊閡閡</font>，挷毋起來，看你有辦法嚒？</span></font></p>
-	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="Times New Roman, serif"><font size="2" style="font-size: 11pt">zut</font>
-	<font size="2" style="font-size: 11pt">lok</font> <font size="2" style="font-size: 11pt">bén</font>
-	<font size="2" style="font-size: 11pt">góng</font> <font size="2" style="font-size: 11pt">há
-	</font></font><font face="新細明體"><span lang="zh-TW"><font face="細明體">椊</font>落<font face="細明體">崩崗</font>下＝<font face="細明體">栽</font>下<font face="細明體">懸崖</font>下去。<font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font>奇<font face="細明體">怪</font>！這<font face="細明體">崩崗漘</font>也無大轉<font face="細明體">彎</font>，<font face="細明體">警</font>示牌也清清楚楚，仰會長<font face="細明體">透</font>有人<font face="細明體">椊</font>落<font face="細明體">崩崗</font>下，係毋係…？<font face="細明體">唉唷</font>！<font face="細明體">莫想</font>較<font face="細明體">贏</font>，<font face="細明體">想</font>起來會發屎驚。</span></font></p>
-	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="Times New Roman, serif"><font size="2" style="font-size: 11pt">zut
-	lok bí t</font><font size="2" style="font-size: 11pt"><u>o</u></font><font size="2" style="font-size: 11pt">ng
-	dù </font></font><font face="新細明體"><span lang="zh-TW"><font face="細明體">椊</font>落<font face="細明體">陂塘</font>肚＝<font face="細明體">栽</font>到<font face="細明體">池塘裡</font>去。<font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font><font face="細明體">昨</font>晡暗，阿成食<font face="細明體">酒</font>食到醉仔，<font face="細明體">椊</font>落<font face="細明體">陂塘</font>肚，<font face="細明體">險險浸</font>死。</span></font></p>
-	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="Times New Roman, serif"><font size="2" style="font-size: 11pt">zut
-	lok hi </font></font><font face="新細明體"><span lang="zh-TW"><span style="letter-spacing: normal">椊落去＝</span><span style="letter-spacing: normal"></span><span style="letter-spacing: normal">把蓋子蓋上去。</span><font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font><span style="letter-spacing: normal">豆油倒好，椊仔椊落去，再過拿冰箱肚放。</span><span style="letter-spacing: normal"></span><span style="letter-spacing: normal">摔下去。</span><font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font>佇這崩崗頂椊落去，該俟</span></font><font face="Times New Roman, serif">(s<u>i</u>i)</font><font face="新細明體"><span lang="zh-TW">會無命哦！</span></font></p>
-	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="Times New Roman, serif"><font size="2" style="font-size: 11pt">zut
-	lut t</font><font size="2" style="font-size: 11pt"><u>e</u></font><font size="2" style="font-size: 11pt">u
-	</font></font><font face="新細明體"><span lang="zh-TW">椊硉頭＝</span></font><font face="Times New Roman, serif">(</font><font face="新細明體"><span lang="zh-TW">鍋蓋等上面的</span></font><font face="Times New Roman, serif">)</font><font face="新細明體"><span lang="zh-TW">小把手。<font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font><font face="細明體">鑊蓋頂</font>个<font face="細明體">椊硉頭</font>撙毋<font face="細明體">緪</font>哩，<font face="細明體">今晡日轉夜買隻轉來</font>。</span></font></p>
-	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="Times New Roman, serif"><font size="2" style="font-size: 11pt">zut
-	nai vi hi lè </font></font><font face="新細明體"><span lang="zh-TW"><span style="letter-spacing: normal">椊奈位去哩＝放哪兒去了？</span><font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font><span style="letter-spacing: normal">鑿仔椊到奈位去哩？仰櫥仔、拖箱角尋透透還尋毋捯？</span></span></font></p>
-	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="Times New Roman, serif"><font size="2" style="font-size: 11pt">zut
-	sì </font></font><font face="新細明體"><span lang="zh-TW"><span style="letter-spacing: normal">椊死＝栽下而死。</span><font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font><span style="letter-spacing: normal">其老公幾下年前騎車仔經過高橋，毋知仰仔踵下去椊死忒。</span></span></font></p>
-	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="Times New Roman, serif"><font size="2" style="font-size: 11pt">zut
-	sì g</font><font size="2" style="font-size: 11pt"><u>i</u></font><font size="2" style="font-size: 11pt">
-	</font></font><font face="新細明體"><span lang="zh-TW"><span style="letter-spacing: normal">椊死佢＝</span><span style="letter-spacing: normal"></span><span style="letter-spacing: normal">抓他的頭來撞地，把他給撞死。</span><font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font><span style="letter-spacing: normal">這夭壽仔！係講分</span><span style="letter-spacing: normal">捯</span><span style="letter-spacing: normal">，椊死佢。</span><span style="letter-spacing: normal"></span><span style="letter-spacing: normal">咒人栽下而死。</span><font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font><span style="letter-spacing: normal">車仔騎恁亟，椊死佢。</span></span></font></p>
-	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="Times New Roman, serif"><font size="2" style="font-size: 11pt">zut
-	sì sì </font></font><font face="新細明體"><span lang="zh-TW"><span style="letter-spacing: normal">椊死死＝栽下而且當場死亡，語氣強調作「</span></span></font><font face="Times New Roman, serif">zut
-	sí sì</font><font face="新細明體"><span lang="zh-TW"><font face="細明體">」</font><span style="letter-spacing: normal">。</span><font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font><span style="letter-spacing: normal">後生人就係恁儴，講毋聽，佇山頂騎車仔還騎當亟，踵落崩崗，椊死死。</span></span></font></p>
-	<p class="western" style="margin-left: 0.64cm; text-indent: -0.64cm; margin-bottom: 0cm; line-height: 0.53cm">
-	<font face="Times New Roman, serif"><font size="4" style="font-size: 14pt"><i><b>z<span dir="ltr" style="float: left; width: 5cm; height: 0.5cm; border: none; padding: 0cm; background: #ffffff">
-		<p align="left" style="margin-left: 0cm; text-indent: 0cm; margin-bottom: 0cm; line-height: 0.42cm">
-		<font face="Times New Roman, serif"><i>zut </i></font><font face="新細明體"><span lang="zh-TW">－</span></font><font face="Times New Roman, serif"><i>zziot
-		</i></font>
-		</p>
-	</span>ze </b></i></font></font>
-	</p>
-	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="Times New Roman, serif"><font size="2" style="font-size: 11pt">zze
-	lì </font></font><font face="新細明體"><span lang="zh-TW"><span style="letter-spacing: normal">軟糖，源自日本語「ゼリー」，英語「</span></span></font><font face="Times New Roman, serif">jelly</font><font face="新細明體"><span lang="zh-TW"><span style="letter-spacing: normal">」，是臺灣自日治時代以來的小零食，亦用於祭品「五燥」之一。</span></span></font></p>
-	<p class="western" style="margin-left: 0.64cm; text-indent: -0.64cm; margin-bottom: 0cm; line-height: 0.53cm">
-	<font face="Times New Roman, serif"><font size="4" style="font-size: 14pt"><i><b>zzi
-	</b></i></font></font>
-	</p>
-	<p class="western" style="margin-left: 0.64cm; text-indent: -0.64cm; margin-bottom: 0cm; line-height: 0.53cm">
-	<font face="新細明體"><span lang="zh-TW">參考「</span></font><font face="Times New Roman, serif"><b>l</b><u><b>a</b></u><b>
-	zzi ò</b></font><font face="新細明體"><span lang="zh-TW"><b>」</b>。</span></font></p>
-	<p class="western" style="margin-left: 0.64cm; text-indent: -0.64cm; margin-bottom: 0cm; line-height: 0.53cm">
-	<font face="Times New Roman, serif"><font size="4" style="font-size: 14pt"><i><b>zziak
-	</b></i></font></font>
-	</p>
-	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="Times New Roman, serif"><font size="2" style="font-size: 11pt">zziak
-	k</font><font size="2" style="font-size: 11pt"><u>i</u></font><font size="2" style="font-size: 11pt">
-	</font></font><font face="新細明體"><span lang="zh-TW">千斤頂，源自日本語「<font size="1" style="font-size: 8pt">じゃっき</font>」，英語「</span></font><font face="Times New Roman, serif">jack</font><font face="新細明體"><span lang="zh-TW">」，<span style="letter-spacing: normal">六堆客家作「萬力、鐵人仔」。</span></span></font></p>
-	<p class="western" style="margin-left: 0.64cm; text-indent: -0.64cm; margin-bottom: 0cm; line-height: 0.53cm">
-	<font face="Times New Roman, serif"><font size="4" style="font-size: 14pt"><i><b>zziàm
-	</b></i></font></font>
-	</p>
-	<p class="western" style="margin-left: 0.64cm; text-indent: -0.64cm; margin-bottom: 0cm; line-height: 0.53cm">
-	<font face="Times New Roman, serif"><font size="2" style="font-size: 11pt">zziàm
-	bb</font><font size="2" style="font-size: 11pt"><u>a</u></font><font size="2" style="font-size: 11pt">
-	</font></font><font face="新細明體"><span lang="zh-TW"><span lang="ja-JP">運動外套，源自日本語「</span><font size="1" style="font-size: 8pt"><span lang="ja-JP">ジャンパー</span></font><span lang="ja-JP">」。</span></span></font></p>
-	<p class="western" style="margin-left: 0.64cm; text-indent: -0.64cm; margin-bottom: 0cm; line-height: 0.53cm">
-	<font face="Times New Roman, serif"><font size="4" style="font-size: 14pt"><i><b>zziò
-	</b></i></font></font>
-	</p>
-	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="Times New Roman, serif"><font size="2" style="font-size: 11pt">zziò
-	d</font><font size="2" style="font-size: 11pt"><u>o</u></font><font size="2" style="font-size: 11pt">
-	</font></font><font face="新細明體"><span lang="zh-TW"><span style="letter-spacing: normal">棒極了、好極了。源自日本語「上等</span></span></font><font face="Times New Roman, serif">(</font><font face="新細明體"><span lang="zh-TW"><font size="1" style="font-size: 8pt">じょうとう</font></span></font><font face="Times New Roman, serif">)</font><font face="新細明體"><span lang="zh-TW"><span style="letter-spacing: normal">」，又作「</span></span></font><font face="Times New Roman, serif">zziot
-	dò</font><font face="新細明體"><span lang="zh-TW"><span style="letter-spacing: normal">」。</span><font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font></span></font><font face="Times New Roman, serif">zziò
-	d<u>o</u></font><font face="新細明體"><span lang="zh-TW">！這擺考<font face="細明體">試</font>个題目，全部有<font face="細明體">準備</font>捯，考好學校應該無麼个問題。</span></font></p>
-	<p class="western" style="margin-left: 0.64cm; text-indent: -0.64cm; margin-bottom: 0cm; line-height: 0.53cm">
-	<font face="Times New Roman, serif"><font size="4" style="font-size: 14pt"><i><b>zzio
-	</b></i></font></font>
-	</p>
-	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="Times New Roman, serif"><font size="2" style="font-size: 11pt">zzio
-	lò </font></font><font face="新細明體"><span lang="zh-TW"><font face="細明體"><span lang="ja-JP">噴壺</span></font><span lang="ja-JP">，源自日語「如</span><font face="細明體"><span lang="ja-JP">雨露</span></font></span></font><font face="Times New Roman, serif">(</font><font face="新細明體"><span lang="zh-TW"><font size="1" style="font-size: 8pt"><span lang="ja-JP">じょうろ</span></font></span></font><font face="Times New Roman, serif">)</font><font face="新細明體"><span lang="zh-TW"><span lang="ja-JP">、如</span><font face="細明體"><span lang="ja-JP">露</span></font></span></font><font face="Times New Roman, serif">(</font><font face="新細明體"><span lang="zh-TW"><font size="1" style="font-size: 8pt"><span lang="ja-JP">じょろ</span></font></span></font><font face="Times New Roman, serif">)</font><font face="新細明體"><span lang="zh-TW"><span lang="ja-JP">」。</span><font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font>淋<font face="細明體">白</font>菜，水愛用<font face="細明體">閕</font>，無就用</span></font><font face="Times New Roman, serif">zzio
-	lò </font><font face="新細明體"><span lang="zh-TW">來<font face="細明體">噴</font>，做毋得用<font face="細明體">潑</font>。<font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b>又</b></font></font><font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font><font face="細明體">牽</font>豬哥个人手項長<font face="細明體">透</font>拿等</span></font><font face="Times New Roman, serif">zzio
-	lò </font><font face="新細明體"><span lang="zh-TW"><font face="細明體">，你仰</font>手項也長<font face="細明體">透</font>拿等</span></font><font face="Times New Roman, serif">zzio
-	lò </font><font face="新細明體"><span lang="zh-TW">？你也<font face="細明體">牽</font>豬哥係嚒？</span></font></p>
-	<p class="western" style="margin-bottom: 0cm; line-height: 0.53cm"><font face="Times New Roman, serif"><font size="4" style="font-size: 14pt"><i><b>zziot
-	</b></i></font></font>
-	</p>
-	<p class="western" style="margin-bottom: 0cm; border: none; padding: 0cm; line-height: 0.53cm">
-	<font face="Times New Roman, serif"><font size="2" style="font-size: 11pt">zziot
-	dò </font></font><font face="新細明體"><span lang="zh-TW"><span style="letter-spacing: normal">棒極了、好極了。源自日語「上等</span></span></font><font face="Times New Roman, serif">(</font><font face="新細明體"><span lang="zh-TW"><font size="1" style="font-size: 8pt">じょうとう</font></span></font><font face="Times New Roman, serif">)</font><font face="新細明體"><span lang="zh-TW"><span style="letter-spacing: normal">」，又作「</span></span></font><font face="Times New Roman, serif">zziò
-	d<u>o</u></font><font face="新細明體"><span lang="zh-TW"><span style="letter-spacing: normal">」。</span><font face="華康粗黑體"><font size="1" style="font-size: 8pt"><b></b></font></font></span></font><font face="Times New Roman, serif">zziot
-	dò</font><font face="新細明體"><span lang="zh-TW"><span style="letter-spacing: normal">！恁儴做，</span><span style="letter-spacing: normal"></span><span style="letter-spacing: normal">毋信佢還有麼个辦法做比</span><span style="letter-spacing: normal"></span><span style="letter-spacing: normal">較好。</span></span></font></p>
-</div>
-<div title="footer">
-	<p align="center" style="margin-top: 0.85cm; margin-bottom: 0cm; line-height: 0.53cm">
-	<br/>
+zung 粽綜錝
 
-	</p>
+粽(作弄切，宗去聲。角黍也。)
+
+參考「粽仔」。
+
+參考「肉粽粽仔」。
+
+zung è 粽仔＝用竹葉或竹籜裹糯米和佐料所製成的食品，客家習俗通常在端午節及七月半做來吃。客家粽包括有米粽、粄粽、焿粽。
+
+zung kuan 粽擐＝綁粽子用的繩串。包粽仔之前，愛先粽擐吊起來。
+
+zung yap 粽葉＝包粽子時用的竹葉。焿粽愛用粽葉來包，較脆；米粽愛用竹殼來包，較球；粄粽愛用月桃葉來包，較夭。
+
+zụt 卒脺
+
+卒(臧沒切，尊入聲。說文：隸人給事者。)
+
+兵士。兵卒。
+
+象棋中的卒子。
+
+終了。卒業。
+
+心情悒鬱。心情殟(vụt)卒。
+
+脺(客語借用字。)
+
+胖的樣子。人害人肥脺脺，天害人一把骨。
+
+zụt è 卒仔＝小兵。毋好看別人恁無，成時細卒仔乜會建立大功勞。象棋中的卒子。卒仔過河，一步一步行，堵佇象腳、馬腳就當有用處。
+
+zụt ngiap 卒業＝畢業，源自日本語「卒業(そつぎょう)」。你看佢小學都無卒業，事業乜做到拚拚袞。
+
+zut 啐椊
+
+啐(子聿切，即聿切，即律切，音卒。嘈啐，眾聲也。)
+
+被人利用的傻子，參考「阿啐頭」。
+
+細語不斷的樣子，又作「cut」。唧唧啐啐(zit zit zut zut)。
+
+參考「肉啐啐仔」。
+
+椊(昨沒切，存入聲。唐韻：椊杌，以柄內孔也。玉篇：柱頭枘也。)讀音作「cụt」。
+
+塞子。樹椊仔。
+
+塞住。椊緪、椊倒轉去。
+
+頭撞地。椊落崩崗下、椊捯。
+
+塞(某物)給人。名片椊等來、椊分佢。
+
+放置。椊奈位去。
+
+zut bún gi 椊分佢＝塞給他。你插蛸佢愛抑無愛，椊分佢就好走哩。
+
+zut bún gi sì 椊分佢死＝抓他的頭撞地，把他給撞死。
+
+zut dèn 椊等＝塞子塞住。好得有椊仔椊等，無俟早都揮發淨淨哩。
+
+zut dèn loi 椊等來＝(很多東西)塞著過來。人看佢山歌唱到恁好，名片相埰椊等來分佢，想愛認識佢。
+
+zut dò 椊捯＝頭撞到地。佢上隻月椊捯了後，無醒來過，醫生宣布佢傷捯大腦，可能會變植物人。
+
+zut do zòn hi 椊倒轉去＝把蓋子蓋回去。豆油倒好過後，椊仔愛椊倒轉去，正毋會走味。
+
+zut è 椊仔＝瓶口的塞子。頭擺罌仔都用樹椊仔來椊，這下用捦上去个，其實做毋得講係椊仔哩。
+
+zut hen 椊緪＝塞子塞緊。酒椊仔愛椊緪來，無俟(sii)會走味哦！
+
+zut het het 椊閡閡＝塞得緊緊地。椊仔椊閡閡，挷毋起來，看你有辦法嚒？
+
+zut lok bén góng há 椊落崩崗下＝栽下懸崖下去。奇怪！這崩崗漘也無大轉彎，警示牌也清清楚楚，仰會長透有人椊落崩崗下，係毋係…？唉唷！莫想較贏，想起來會發屎驚。
+
+zut lok bí tong dù 椊落陂塘肚＝栽到池塘裡去。昨晡暗，阿成食酒食到醉仔，椊落陂塘肚，險險浸死。
+
+zut lok hi 椊落去＝把蓋子蓋上去。豆油倒好，椊仔椊落去，再過拿冰箱肚放。摔下去。佇這崩崗頂椊落去，該俟(sii)會無命哦！
+
+zut lut teu 椊硉頭＝(鍋蓋等上面的)小把手。鑊蓋頂个椊硉頭撙毋緪哩，今晡日轉夜買隻轉來。
+
+zut nai vi hi lè 椊奈位去哩＝放哪兒去了？鑿仔椊到奈位去哩？仰櫥仔、拖箱角尋透透還尋毋捯？
+
+zut sì 椊死＝栽下而死。其老公幾下年前騎車仔經過高橋，毋知仰仔踵下去椊死忒。
+
+zut sì gi 椊死佢＝抓他的頭來撞地，把他給撞死。這夭壽仔！係講分捯，椊死佢。咒人栽下而死。車仔騎恁亟，椊死佢。
+
+zut sì sì 椊死死＝栽下而且當場死亡，語氣強調作「zut sí sì」。後生人就係恁儴，講毋聽，佇山頂騎車仔還騎當亟，踵落崩崗，椊死死。
+
+zze
+
+zze lì 軟糖，源自日本語「ゼリー」，英語「jelly」，是臺灣自日治時代以來的小零食，亦用於祭品「五燥」之一。
+
+zzi
+
+參考「la zzi ò」。
+
+zziak
+
+zziak ki 千斤頂，源自日本語「じゃっき」，英語「jack」，六堆客家作「萬力、鐵人仔」。
+
+zziàm
+
+zziàm bba 運動外套，源自日本語「ジャンパー」。
+
+zziò
+
+zziò do 棒極了、好極了。源自日本語「上等(じょうとう)」，又作「zziot dò」。zziò do！這擺考試个題目，全部有準備捯，考好學校應該無麼个問題。
+
+zzio
+
+zzio lò 噴壺，源自日語「如雨露(じょうろ)、如露(じょろ)」。淋白菜，水愛用閕，無就用zzio lò 來噴，做毋得用潑。又牽豬哥个人手項長透拿等zzio lò ，你仰手項也長透拿等zzio lò ？你也牽豬哥係嚒？
+
+zziot
+
+zziot dò 棒極了、好極了。源自日語「上等(じょうとう)」，又作「zziò do」。zziot dò！恁儴做，毋信佢還有麼个辦法做比較好。
+
+
 ' }
